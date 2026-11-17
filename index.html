@@ -1,0 +1,147 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FX ORIYAWAN</title>
+<script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#0b1220;color:#e2e8f0;font-family:Arial,sans-serif}
+header{height:62px;background:#111827;border-bottom:1px solid #273449;
+display:flex;align-items:center;justify-content:space-between;padding:0 20px}
+.logo{font-size:21px;font-weight:bold;color:#38bdf8;letter-spacing:1px}
+.tag{font-size:11px;color:#94a3b8}
+.toolbar{display:flex;gap:9px;padding:12px;flex-wrap:wrap}
+select,button{background:#1e293b;color:#e2e8f0;border:1px solid #334155;
+padding:10px;border-radius:5px}
+button{cursor:pointer;background:#0369a1;border-color:#0284c7}
+#chart{height:calc(100vh - 165px);min-height:350px;width:100%}
+.status{padding:10px 14px;color:#94a3b8;font-size:12px}
+.info{padding:0 14px 10px;font-size:13px;color:#94a3b8}
+@media(max-width:600px){
+ header{padding:0 12px}.logo{font-size:17px}
+ #chart{height:70vh;min-height:320px}
+ .toolbar{gap:6px;padding:8px}
+ select,button{padding:8px;font-size:12px}
+}
+</style>
+</head>
+<body>
+<header>
+ <div class="logo">FX ORIYAWAN</div>
+ <div class="tag">FOREX CHARTING PLATFORM</div>
+</header>
+
+<div class="toolbar">
+ <select id="pair">
+  <option value="EUR/USD">EURUSD</option>
+  <option value="GBP/USD">GBPUSD</option>
+  <option value="USD/JPY">USDJPY</option>
+  <option value="AUD/USD">AUDUSD</option>
+  <option value="USD/CAD">USDCAD</option>
+  <option value="USD/CHF">USDCHF</option>
+  <option value="NZD/USD">NZDUSD</option>
+  <option value="XAU/USD">XAUUSD</option>
+ </select>
+ <select id="interval">
+  <option value="1min">1 Minute</option>
+  <option value="5min">5 Minutes</option>
+  <option value="15min">15 Minutes</option>
+  <option value="1h" selected>1 Hour</option>
+  <option value="4h">4 Hours</option>
+  <option value="1day">1 Day</option>
+ </select>
+ <button id="load">Load candles</button>
+</div>
+
+<div class="info">
+ <span id="pairLabel">EUR/USD</span>
+ <span> · Latest close: </span><b id="price">--</b>
+</div>
+
+<div id="chart"></div>
+<div class="status" id="status">Ready to load historical data.</div>
+
+<script>
+const chartElement=document.getElementById('chart');
+
+const chart=LightweightCharts.createChart(chartElement,{
+ layout:{
+  background:{color:'#0b1220'},
+  textColor:'#cbd5e1'
+ },
+ grid:{
+  vertLines:{color:'#172033'},
+  horzLines:{color:'#172033'}
+ },
+ rightPriceScale:{borderColor:'#334155'},
+ timeScale:{
+  borderColor:'#334155',
+  timeVisible:true,
+  secondsVisible:false
+ },
+ crosshair:{mode:LightweightCharts.CrosshairMode.Normal}
+});
+
+const series=chart.addCandlestickSeries({
+ upColor:'#22c55e',
+ downColor:'#ef4444',
+ borderUpColor:'#22c55e',
+ borderDownColor:'#ef4444',
+ wickUpColor:'#22c55e',
+ wickDownColor:'#ef4444'
+});
+
+async function loadCandles(){
+ const pair=document.getElementById('pair').value;
+ const interval=document.getElementById('interval').value;
+ const status=document.getElementById('status');
+
+ status.textContent='Loading historical market data...';
+
+ try{
+  const url='/.netlify/functions/forex?symbol='+
+   encodeURIComponent(pair)+'&interval='+encodeURIComponent(interval);
+
+  const response=await fetch(url);
+  const result=await response.json();
+
+  if(!response.ok || result.error){
+   throw new Error(result.error || 'Unable to load data');
+  }
+
+  if(!result.candles || result.candles.length===0){
+   throw new Error('No historical candles received');
+  }
+
+  series.setData(result.candles);
+
+  document.getElementById('pairLabel').textContent=pair;
+  document.getElementById('price').textContent=
+   result.candles[result.candles.length-1].close;
+
+  status.textContent='Loaded '+result.candles.length+
+   ' historical candles.';
+
+  chart.timeScale().fitContent();
+
+ }catch(error){
+  status.textContent='Error: '+error.message;
+ }
+}
+
+document.getElementById('load').addEventListener('click',loadCandles);
+document.getElementById('pair').addEventListener('change',loadCandles);
+document.getElementById('interval').addEventListener('change',loadCandles);
+
+const observer=new ResizeObserver(entries=>{
+ chart.applyOptions({width:entries[0].contentRect.width});
+});
+observer.observe(chartElement);
+
+loadCandles();
+</script>
+</body>
+</html>
